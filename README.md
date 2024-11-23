@@ -20,7 +20,7 @@ Test with:
 ### Backend (Flask)
 Run backend with:
 ```bash
-scripts/run-frontend.sh
+scripts/run-backend.sh
 ```
 
 Test with:
