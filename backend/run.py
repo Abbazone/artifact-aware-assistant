@@ -9,7 +9,7 @@ def create_app():
     
     app.register_blueprint(api_bp)
     app.register_blueprint(static_bp)
-    app.register_blueprint(subscription_bp)
+    # app.register_blueprint(subscription_bp)
     
     return app
 
