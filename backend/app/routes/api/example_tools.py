@@ -126,7 +126,7 @@ Your Real Estate Agent
 get_listing_schema = {
     "name": "get_listing",
     "description": "Get details about a specific property listing",
-    "input_schema": {
+    "parameters": {
         "type": "object",
         "properties": {
             "address": {
@@ -134,14 +134,15 @@ get_listing_schema = {
                 "description": "The street address to look up"
             }
         },
-        "required": ["address"]
+        "required": ["address"],
+        "additionalProperties": False
     }
 }
 
 get_comparables_schema = {
     "name": "get_comparables",
     "description": "Get comparable property listings in the area",
-    "input_schema": {
+    "parameters": {
         "type": "object",
         "properties": {
             "address": {
@@ -157,7 +158,7 @@ get_comparables_schema = {
 get_email_template_schema = {
     "name": "get_email_template",
     "description": "Get an email template for sending property listings to prospective buyers. This is just the template, not the actual email. This template should not be edited unless the user explicitly asks to edit it. The contents of the actual instantiated email, however, can be edited.",
-    "input_schema": {
+    "parameters": {
         "type": "object",
         "properties": {},
     }
@@ -166,6 +167,6 @@ get_email_template_schema = {
 
 tools = [
     Tool(get_listing_schema, get_listing),
-    Tool(get_comparables_schema, get_comparables),
-    Tool(get_email_template_schema, get_email_template),
+    # Tool(get_comparables_schema, get_comparables),
+    # Tool(get_email_template_schema, get_email_template),
 ]
