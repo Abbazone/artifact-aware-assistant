@@ -26,19 +26,20 @@ def get_listing(address):
     ],
 }}
 """
-    
+
     artifact = Artifact(
         identifier="18bacG4a",
-        type="application/json", 
-        title=address, 
+        type="application/json",
+        title=address,
         content=content)
     return str(artifact)
 
+
 def get_comparables(address):
     artifact = Artifact(
-        identifier="3baf9f83", 
-        type="application/json", 
-        title=f"{address} Comparables", 
+        identifier="3baf9f83",
+        type="application/json",
+        title=f"{address} Comparables",
         content="""\
 [
     {
@@ -93,11 +94,12 @@ def get_comparables(address):
 """)
     return str(artifact)
 
+
 def get_email_template():
     artifact = Artifact(
-        identifier="98acb34d", 
-        type="text/plain", 
-        title="Prospective Buyer Listing Email Template", 
+        identifier="98acb34d",
+        type="text/plain",
+        title="Prospective Buyer Listing Email Template",
         content="""
 Dear {buyer_name},
 
@@ -123,10 +125,11 @@ Your Real Estate Agent
 """)
     return str(artifact)
 
+
 get_listing_schema = {
     "name": "get_listing",
     "description": "Get details about a specific property listing",
-    "parameters": {
+    "input_schema": {
         "type": "object",
         "properties": {
             "address": {
@@ -134,15 +137,14 @@ get_listing_schema = {
                 "description": "The street address to look up"
             }
         },
-        "required": ["address"],
-        "additionalProperties": False
+        "required": ["address"]
     }
 }
 
 get_comparables_schema = {
     "name": "get_comparables",
     "description": "Get comparable property listings in the area",
-    "parameters": {
+    "input_schema": {
         "type": "object",
         "properties": {
             "address": {
@@ -158,15 +160,14 @@ get_comparables_schema = {
 get_email_template_schema = {
     "name": "get_email_template",
     "description": "Get an email template for sending property listings to prospective buyers. This is just the template, not the actual email. This template should not be edited unless the user explicitly asks to edit it. The contents of the actual instantiated email, however, can be edited.",
-    "parameters": {
+    "input_schema": {
         "type": "object",
         "properties": {},
     }
 }
 
-
 tools = [
     Tool(get_listing_schema, get_listing),
-    # Tool(get_comparables_schema, get_comparables),
-    # Tool(get_email_template_schema, get_email_template),
+    Tool(get_comparables_schema, get_comparables),
+    Tool(get_email_template_schema, get_email_template),
 ]

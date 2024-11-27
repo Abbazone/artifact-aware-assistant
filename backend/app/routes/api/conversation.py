@@ -1,14 +1,8 @@
-import json
 import re
 import os
 
 import anthropic
-import openai
-
-
 os.environ['no_proxy'] = "10.227.91.60"
-# model = 'gpt-3.5-turbo'
-model = 'qwen2.5-72b-instruct'
 
 
 class Artifact:
@@ -20,10 +14,10 @@ class Artifact:
 
     def __str__(self):
         return f'<artifact identifier="{self.identifier}" type="{self.type}" title="{self.title}">\n{self.content}\n</artifact>'
-    
+
     def __repr__(self):
         return f'Artifact(identifier="{self.identifier}", title="{self.title}")'
-    
+
     def dict(self):
         return {
             'identifier': self.identifier,
@@ -31,12 +25,14 @@ class Artifact:
             'title': self.title,
             'content': self.content,
         }
-    
+
+
 class Tool:
     def __init__(self, schema, callable):
         self.schema = schema
         self.callable = callable
         self.name = schema["name"]
+
 
 SYSTEM_MESSAGE = f"""\
 You are a helpful assistant.
@@ -70,11 +66,11 @@ Artifacts are self-contained pieces of content that can be referenced in the con
     def sort_ints(ints):
         if len(ints) <= 1:
             return ints
-            
+
         mid = len(ints) // 2
         left = sort_ints(ints[:mid])
         right = sort_ints(ints[mid:])
-        
+
         # Merge sorted halves
         result = []
         i = j = 0
@@ -85,7 +81,7 @@ Artifacts are self-contained pieces of content that can be referenced in the con
             else:
                 result.append(right[j])
                 j += 1
-                
+
         result.extend(left[i:])
         result.extend(right[j:])
         return result
@@ -103,11 +99,11 @@ Artifacts are self-contained pieces of content that can be referenced in the con
     def sort_ints(ints):
         if len(ints) <= 1:
             return ints
-            
+
         mid = len(ints) // 2
         left = sort_ints(ints[:mid])
         right = sort_ints(ints[mid:])
-        
+
         # Merge sorted halves in descending order
         result = []
         i = j = 0
@@ -118,7 +114,7 @@ Artifacts are self-contained pieces of content that can be referenced in the con
             else:
                 result.append(right[j])
                 j += 1
-                
+
         result.extend(left[i:])
         result.extend(right[j:])
         return result
@@ -130,36 +126,27 @@ Artifacts are self-contained pieces of content that can be referenced in the con
 </artifacts_info>
 """
 
+
 class Conversation:
     def __init__(self, tools=None, messages=None, artifacts=None):
-        # self.client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-        # self.model = "claude-3-5-sonnet-20241022"
-        self.client = openai.OpenAI(
-            base_url='http://api.openai.ukrc.huawei.com/v1',
-            api_key='sk-1234'
-        )
-        self.model = model
+        self.client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.model = "claude-3-5-sonnet-20241022"
         self.messages = messages or []
         self.artifacts = artifacts or []
         self.tools = tools or []
-        
+
     def say(self, message):
         system_message = self._generate_system_message(self.artifacts)
-        tools = [{"type": "function", "function": t.schema} for t in self.tools]
+        tools = [t.schema for t in self.tools]
 
         self.messages.append({
-            "role": "system",
-            "content": system_message
-        })
-
-        self.messages.append({
-            "role": "user", 
+            "role": "user",
             "content": message
         })
 
-        # response = self.client.messages.create(
-        response = self.client.chat.completions.create(
+        response = self.client.messages.create(
             model=self.model,
+            system=system_message,
             messages=self.messages,
             max_tokens=3000,
             temperature=0.7,
@@ -167,35 +154,37 @@ class Conversation:
         )
 
         # Handle potential tool use
-        while response.choices[0].finish_reason == "tool_calls":
+        while response.stop_reason == "tool_use":
             tool_result_messages = []
-            for block in response.choices[0].message.tool_calls:
-                if block.type == "function":
-                    tool_use = block.function
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_use = block
                     tool_name = tool_use.name
-                    tool_input = json.loads(tool_use.arguments)
+                    tool_input = tool_use.input
                     tool_result = self._process_tool_call(tool_name, tool_input)
                     tool_result_messages.append({
-                        "role": "tool",
-                        "tool_call_id": block.id,
-                        "content": json.dumps(tool_result)
+                        "type": "tool_result",
+                        "tool_use_id": tool_use.id,
+                        "content": tool_result,
                     })
 
-            # self.messages.append({"role": "assistant", "content": response.choices[0].message.content})
-            self.messages.append(response.choices[0].message)    # role = 'assistant'
-            self.messages += tool_result_messages
+            self.messages.append({"role": "assistant", "content": response.content})
+            self.messages.append({
+                "role": "user",
+                "content": tool_result_messages,
+            })
 
             # Get final response after tool use
-            response = self.client.chat.completions.create(
+            response = self.client.messages.create(
                 model=self.model,
+                system=system_message,
                 messages=self.messages,
                 max_tokens=3000,
                 temperature=0.7,
                 tools=tools,
             )
-        
-        # assistant_message = response.content[0].text
-        assistant_message = response.choices[0].message.content
+
+        assistant_message = response.content[0].text
         self.messages.append({"role": "assistant", "content": assistant_message})
         artifacts, messages = self._extract_messages_and_artifacts()
 
@@ -203,23 +192,24 @@ class Conversation:
             'messages': messages,
             'artifacts': artifacts,
         }
-    
+
     def _process_tool_call(self, tool_name, tool_input):
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool.callable(**tool_input)
         raise Exception(f"Tool {tool_name} not found")
-    
+
     def _generate_system_message(self, artifacts):
         artifacts_info = "\n".join([str(artifact) for artifact in artifacts])
         system_message = SYSTEM_MESSAGE
-        
+
         if artifacts:
             system_message += f"""\
-            <artifacts>
-            {artifacts_info}
-            </artifacts>
-            """
+
+<artifacts>
+{artifacts_info}
+</artifacts>
+"""
         return system_message
 
     def _extract_messages_and_artifacts(self):
@@ -231,14 +221,8 @@ class Conversation:
 
         # Process each message
         for message in self.messages:
-            if isinstance(message, dict):
-                content = message['content']
-                role = message["role"]
-            else:
-                content = message.content
-                role = message.role
-
-            new_message = {"role": role}
+            content = message['content']
+            new_message = {"role": message["role"]}
 
             # Process string content
             if isinstance(content, str):
@@ -249,36 +233,36 @@ class Conversation:
                 continue
 
             # Process list content
-            # if isinstance(content, list):
-            #     new_content_list = []
-            #     for item in content:
-            #         # Handle string items
-            #         if isinstance(item, str):
-            #             new_item, item_artifacts = self._process_content(item)
-            #             artifacts.extend(item_artifacts)
-            #             new_content_list.append(new_item)
-            #             continue
-            #
-            #         # Handle dict-like items
-            #         item_dict = item.dict() if hasattr(item, 'dict') else item
-            #
-            #         if item_dict.get('role') == 'text':
-            #             new_text, text_artifacts = self._process_content(item_dict['text'])
-            #             artifacts.extend(text_artifacts)
-            #             new_item = dict(item_dict)
-            #             new_item['text'] = new_text
-            #             new_content_list.append(new_item)
-            #         elif item_dict.get('role') == 'tool':
-            #             new_content, content_artifacts = self._process_content(item_dict['content'])
-            #             artifacts.extend(content_artifacts)
-            #             new_item = dict(item_dict)
-            #             new_item['content'] = new_content
-            #             new_content_list.append(new_item)
-            #         else:
-            #             new_content_list.append(item_dict)
-            #
-            #     new_message["content"] = new_content_list
-            #     new_messages.append(new_message)
+            if isinstance(content, list):
+                new_content_list = []
+                for item in content:
+                    # Handle string items
+                    if isinstance(item, str):
+                        new_item, item_artifacts = self._process_content(item)
+                        artifacts.extend(item_artifacts)
+                        new_content_list.append(new_item)
+                        continue
+
+                    # Handle dict-like items
+                    item_dict = item.dict() if hasattr(item, 'dict') else item
+
+                    if item_dict.get('type') == 'text':
+                        new_text, text_artifacts = self._process_content(item_dict['text'])
+                        artifacts.extend(text_artifacts)
+                        new_item = dict(item_dict)
+                        new_item['text'] = new_text
+                        new_content_list.append(new_item)
+                    elif item_dict.get('type') == 'tool_result':
+                        new_content, content_artifacts = self._process_content(item_dict['content'])
+                        artifacts.extend(content_artifacts)
+                        new_item = dict(item_dict)
+                        new_item['content'] = new_content
+                        new_content_list.append(new_item)
+                    else:
+                        new_content_list.append(item_dict)
+
+                new_message["content"] = new_content_list
+                new_messages.append(new_message)
 
         # Remove duplicate artifacts keeping only the latest version
         seen_ids = {}
@@ -292,36 +276,36 @@ class Conversation:
     def _process_content(self, text):
         """Helper method to process text content and extract artifacts"""
         artifacts = []
-        
+
         # Find all artifact blocks using regex
         artifact_pattern = r'<artifact\s+identifier="([^"]+)"\s+type="([^"]+)"\s+title="([^"]+)">(.*?)</artifact>'
-        
+
         # Keep track of where we last ended to build the new content
         last_end = 0
         new_content = ""
-        
+
         for match in re.finditer(artifact_pattern, text, re.DOTALL):
             # Add any text before this match
             new_content += text[last_end:match.start()]
-            
+
             # Extract artifact info
             identifier = match.group(1)
             type_ = match.group(2)
             title = match.group(3)
             content = match.group(4).strip()
-            
+
             # Create and store artifact
             artifact = Artifact(identifier, type_, title, content)
             artifacts.append(artifact)
-            
+
             # Add anchor tag
             new_content += f'<a href="#{identifier}">{title}</a>'
-            
+
             last_end = match.end()
-        
+
         # Add any remaining text
         new_content += text[last_end:]
-        
+
         return new_content, artifacts
 
 
