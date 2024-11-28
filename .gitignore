@@ -43,3 +43,6 @@ Icon
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+
+notebooks/.ipynb_checkpoints/
+.idea
