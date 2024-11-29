@@ -135,7 +135,6 @@ class Conversation:
         # self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         self.client = openai.OpenAI(
             base_url='http://api.openai.ukrc.huawei.com/v1',  # UK, EuroRC
-            api_key='sk-1234',
         )
         self.model = model
         self.messages = messages or []
