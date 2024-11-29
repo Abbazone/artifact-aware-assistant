@@ -6,7 +6,6 @@ import anthropic
 import openai
 
 
-os.environ['no_proxy'] = "10.227.91.60"
 # model = 'gpt-4o-mini'
 # model = 'gpt-4-turbo'
 model = 'qwen2.5-72b-instruct'
