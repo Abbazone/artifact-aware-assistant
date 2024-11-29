@@ -7,8 +7,9 @@ import openai
 
 
 os.environ['no_proxy'] = "10.227.91.60"
-model = 'gpt-4-turbo'
-# model = 'qwen2.5-72b-instruct'
+# model = 'gpt-4o-mini'
+# model = 'gpt-4-turbo'
+model = 'qwen2.5-72b-instruct'
 
 
 class Artifact:
@@ -132,7 +133,11 @@ Artifacts are self-contained pieces of content that can be referenced in the con
 
 class Conversation:
     def __init__(self, tools=None, messages=None, artifacts=None):
-        self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        # self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.client = openai.OpenAI(
+            base_url='http://api.openai.ukrc.huawei.com/v1',  # UK, EuroRC
+            api_key='sk-1234',
+        )
         self.model = model
         self.messages = messages or []
         self.artifacts = artifacts or []

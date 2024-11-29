@@ -161,6 +161,7 @@ get_email_template_schema = {
     "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": False
     }
 }
 
@@ -168,5 +169,5 @@ get_email_template_schema = {
 tools = [
     Tool(get_listing_schema, get_listing),
     # Tool(get_comparables_schema, get_comparables),
-    # Tool(get_email_template_schema, get_email_template),
+    Tool(get_email_template_schema, get_email_template),
 ]

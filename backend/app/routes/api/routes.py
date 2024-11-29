@@ -1,3 +1,4 @@
+import json
 from flask import Blueprint, request, jsonify
 from openai.types.chat.chat_completion import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
@@ -54,9 +55,12 @@ def process_tool_uses_and_results(messages):
     tool_uses_content = None
 
     for message in messages:
-        if type(message) == ChatCompletionMessage:
+        if isinstance(message, ChatCompletionMessage):
             # Store tool uses for next iteration
             tool_uses_content = message
+            num_tools = len(tool_uses_content.tool_calls)
+            tool_idx = 0
+            processed_content = []
             continue
 
         if message['role'] == 'tool' and tool_uses_content:
@@ -64,20 +68,21 @@ def process_tool_uses_and_results(messages):
             tool_results_map = {message['tool_call_id']: message['content']}
 
             # Process the content list, replacing tool uses with combined use+result
-            item = tool_uses_content.tool_calls[0]
-            processed_content = [{
+            item = tool_uses_content.tool_calls[tool_idx]
+            processed_content.append({
                 'type': 'tool_use',
                 'name': item.function.name,
-                'input': item.function.arguments,
+                'input': json.loads(item.function.arguments),
                 'output': tool_results_map[item.id]
-            }]
-
-            processed_messages.append({
-                'role': 'assistant',
-                'content': processed_content
             })
 
-            tool_uses_content = None
+            tool_idx += 1
+            if tool_idx == num_tools:
+                processed_messages.append({
+                    'role': 'assistant',
+                    'content': processed_content
+                })
+                tool_uses_content = None
             continue
 
         # Add any other messages as-is
@@ -94,6 +99,7 @@ def unprocess_tool_uses_and_results(messages):
         if message['role'] == 'assistant' and isinstance(message['content'], list):
             assistant_message_content = []
             user_message_content = []
+            tool_calls = []
             for item in message['content']:
                 if item.get('type') == 'tool_use':
                     # Generate unique tool use ID
@@ -103,11 +109,11 @@ def unprocess_tool_uses_and_results(messages):
                     # Split tool use and result into separate messages
                     tool_call = ChatCompletionMessageToolCall(
                         id=tool_use_id,
-                        function=Function(arguments=item['input'], name=item['name']),
+                        function=Function(arguments=json.dumps(item['input']), name=item['name']),
                         type='function'
                     )
 
-                    assistant_message_content.append(ChatCompletionMessage(role='assistant', tool_calls=[tool_call]))
+                    tool_calls.append(tool_call)
 
                     # Store tool result for later
                     user_message_content.append({
@@ -117,6 +123,8 @@ def unprocess_tool_uses_and_results(messages):
                     })
                 else:
                     assistant_message_content.append(item)
+
+            assistant_message_content.append(ChatCompletionMessage(role='assistant', tool_calls=tool_calls))
 
             unprocessed_messages.extend(assistant_message_content)
 
